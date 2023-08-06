@@ -4,6 +4,12 @@
 
 	safetensors.h: a library for reading .safetensors files from C.
 
+	Basic usage: read the entire .safetensors file into memory (this is not
+	handled by safetensors.h) and feed it to safetensors_file_init(). This
+	will populate a safetensors_File struct, which contains an array of 
+	tensor descriptors. You can then loop over the tensor descriptors and 
+	pull out what you need. See the structs and functions below for details.
+
 	This file is a single-header library (credit to Sean Barrett for the
 	idea); it includes both the header and the actual definitions in 
 	a single file. To use this library, copy it  into your project, and 
