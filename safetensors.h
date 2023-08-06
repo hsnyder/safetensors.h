@@ -2,6 +2,8 @@
 	Harris M. Snyder, 2023
 	This is free and unencumbered software released into the public domain.
 
+	safetensors.h: a library for reading .safetensors files from C.
+
 	This file is a single-header library (credit to Sean Barrett for the
 	idea); it includes both the header and the actual definitions in 
 	a single file. To use this library, copy it  into your project, and 
