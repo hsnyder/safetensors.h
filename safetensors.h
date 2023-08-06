@@ -23,36 +23,11 @@
 #ifndef SAFETENSORS_H
 #define SAFETENSORS_H
 
+#include <stdint.h>
+
 #ifndef SAFETENSORS_MAX_DIM 
 #define SAFETENSORS_MAX_DIM 20 
 #endif
-
-#include <stdint.h>
-enum {
-	SAFETENSORS_F64 = 0,
-	SAFETENSORS_F32,
-	SAFETENSORS_F16,
-	SAFETENSORS_BF16,
-	SAFETENSORS_I64,
-	SAFETENSORS_I32,
-	SAFETENSORS_I16,
-	SAFETENSORS_I8,
-	SAFETENSORS_U8,
-	SAFETENSORS_BOOL,
-};
-
-const int safetensors_dtype_sizes[] = {
-	[SAFETENSORS_F64]  = 8,
-	[SAFETENSORS_F32]  = 4,
-	[SAFETENSORS_F16]  = 2,
-	[SAFETENSORS_BF16] = 2,
-	[SAFETENSORS_I64]  = 8,
-	[SAFETENSORS_I32]  = 4,
-	[SAFETENSORS_I16]  = 2,
-	[SAFETENSORS_I8]   = 1,
-	[SAFETENSORS_U8]   = 1,
-	[SAFETENSORS_BOOL] = 1, // TODO check if this is right
-};
 
 typedef struct {
 	int len;
@@ -65,7 +40,7 @@ typedef struct {
 	// memory block passed to safetensors_file_init()
 
 	int dtype;
-	// value will be one of the enums above
+	// will be one of the enum values below
 	
 	int n_dimensions;
 	int64_t shape[SAFETENSORS_MAX_DIM];
@@ -122,7 +97,7 @@ char * safetensors_file_init(void *file_buffer, int64_t file_buffer_size_bytes, 
 
 
 static int safetensors_str_equal(safetensors_Str a, const char * b)
-// for convenience: easily check if a tensor name matches a given string literal
+// For convenience: easily check if a tensor name matches a given string literal
 {
 	if (!b) return 0;
 	int equal = 1;
@@ -131,6 +106,34 @@ static int safetensors_str_equal(safetensors_Str a, const char * b)
 	return equal;
 }
 
+
+// Enum values for the 'dtype' field
+enum {
+	SAFETENSORS_F64 = 0,
+	SAFETENSORS_F32,
+	SAFETENSORS_F16,
+	SAFETENSORS_BF16,
+	SAFETENSORS_I64,
+	SAFETENSORS_I32,
+	SAFETENSORS_I16,
+	SAFETENSORS_I8,
+	SAFETENSORS_U8,
+	SAFETENSORS_BOOL,
+};
+
+// For convenience: sizes of a given dtype code
+const int safetensors_dtype_sizes[] = {
+	[SAFETENSORS_F64]  = 8,
+	[SAFETENSORS_F32]  = 4,
+	[SAFETENSORS_F16]  = 2,
+	[SAFETENSORS_BF16] = 2,
+	[SAFETENSORS_I64]  = 8,
+	[SAFETENSORS_I32]  = 4,
+	[SAFETENSORS_I16]  = 2,
+	[SAFETENSORS_I8]   = 1,
+	[SAFETENSORS_U8]   = 1,
+	[SAFETENSORS_BOOL] = 1, // TODO check if this is right
+};
 
 #endif
 
