@@ -125,21 +125,27 @@ enum {
 	SAFETENSORS_I8,
 	SAFETENSORS_U8,
 	SAFETENSORS_BOOL,
+	
+	SAFETENSORS_NUM_DTYPES
 };
 
 // For convenience: sizes of a given dtype code
-const int safetensors_dtype_sizes[] = {
-	[SAFETENSORS_F64]  = 8,
-	[SAFETENSORS_F32]  = 4,
-	[SAFETENSORS_F16]  = 2,
-	[SAFETENSORS_BF16] = 2,
-	[SAFETENSORS_I64]  = 8,
-	[SAFETENSORS_I32]  = 4,
-	[SAFETENSORS_I16]  = 2,
-	[SAFETENSORS_I8]   = 1,
-	[SAFETENSORS_U8]   = 1,
-	[SAFETENSORS_BOOL] = 1, // TODO check if this is right
-};
+static int safetensors_dtype_size(int dtype)
+{
+	switch(dtype) {
+	case SAFETENSORS_F64:  return 8;
+	case SAFETENSORS_F32:  return 4;
+	case SAFETENSORS_F16:  return 2;
+	case SAFETENSORS_BF16: return 2;
+	case SAFETENSORS_I64:  return 8;
+	case SAFETENSORS_I32:  return 4;
+	case SAFETENSORS_I16:  return 2;
+	case SAFETENSORS_I8:   return 1;
+	case SAFETENSORS_U8:   return 1;
+	case SAFETENSORS_BOOL: return 1; // TODO check if this is right
+	}
+	return 0;
+}
 
 #endif
 
