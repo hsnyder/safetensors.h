@@ -112,6 +112,16 @@ static int safetensors_str_equal(safetensors_Str a, const char * b)
 	return equal;
 }
 
+static int safetensors_lookup(safetensors_File *f, const char *name)
+// For convenience: loop over tensors and return the index of the tensor whose 
+// name matches a given string (or -1, if no match is found).
+{
+	for(int i = 0; i < f->num_tensors; i++)
+		if(safetensors_str_equal(f->tensors[i].name, name))
+			return i;
+	return -1;
+}
+
 
 // Enum values for the 'dtype' field
 enum {
@@ -273,10 +283,9 @@ eat_intlist(char **ptr, char *limit, IntList *out)
 	return 1;
 }
 
-typedef safetensors_Str Str;
 
 static int
-eat_string(char **ptr, char *limit, Str *out) 
+eat_string(char **ptr, char *limit, safetensors_Str *out) 
 {
 	char delim = 0; 
 
@@ -301,15 +310,15 @@ eat_string(char **ptr, char *limit, Str *out)
 		      
 	string_ok: assert(p <= limit);
 	*ptr = p;
-	*out = (Str) {.ptr=start, .len=len};
+	*out = (safetensors_Str) {.ptr=start, .len=len};
 	return 1;
 }
 
 typedef struct {
-	Str key;
+	safetensors_Str key;
 	int value_is_str;
 	union {
-		Str     svalue;
+		safetensors_Str     svalue;
 		IntList ivalue;
 	};
 } KeyValuePair;
@@ -327,7 +336,7 @@ eat_kv_pair(char **ptr, char *limit, KeyValuePair *kvp)
 		return 0;
 
 	// value can be string, or list of integers
-	Str str_value = {0};
+	safetensors_Str str_value = {0};
 	IntList intlist_value = {0};
 	
 	if (!eat_string(&p, limit, &str_value)){
@@ -458,7 +467,7 @@ safetensors_file_init(void *file_buffer, int64_t file_buffer_bytes, safetensors_
 		if (eat(&t,e,'}')) goto header_ok;
 
 		// mandatory string (tensor name)
-		Str tensor_name = {0};
+		safetensors_Str tensor_name = {0};
 		if (!eat_string(&t,e,&tensor_name)) 
 			ST_ERR("Expected tensor name");
 		if (!eat(&t,e,':'))
