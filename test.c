@@ -84,12 +84,17 @@ int main (int argc, char *argv[])
 		return 1;
 	}
 
+	#ifndef CONDENSED_OUTPUT
 	printf("--- TENSORS\n\n");
+	#endif
 
 	for(int i = 0; i < f.num_tensors; i++) {
 		safetensors_TensorDescriptor t = f.tensors[i];
 		debug_print_str(t.name);
-		printf("\n\tdtype: %i\n\tshape: (%i) [", t.dtype, t.n_dimensions);
+		printf("\n");
+
+		#ifndef CONDENSED_OUTPUT
+		printf("\tdtype: %i\n\tshape: (%i) [", t.dtype, t.n_dimensions);
 		for(int j = 0; j < t.n_dimensions; j++) {
 			char *delim = j==t.n_dimensions-1 ? "" : ", ";
 			printf("%lli%s", (long long) t.shape[j], delim);
@@ -98,13 +103,16 @@ int main (int argc, char *argv[])
 				t.begin_offset_bytes, 
 				t.end_offset_bytes,
 				t.ptr);
+		#endif
 	}
 
+	#ifndef CONDENSED_OUTPUT
 	printf("--- METADATA\n\n");
 
 	for(int i = 0; i < f.num_metadata; i++) {
 		safetensors_MetadataEntry m = f.metadata[i];
 		debug_print_kv_str(m.name, m.value);
 	}
+	#endif
 }
 
