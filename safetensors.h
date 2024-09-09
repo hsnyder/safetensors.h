@@ -310,7 +310,10 @@ eat_string(char **ptr, char *limit, safetensors_Str *out)
 		      
 	string_ok: assert(p <= limit);
 	*ptr = p;
-	*out = (safetensors_Str) {.ptr=start, .len=len};
+	safetensors_Str str;
+	str.len = len;
+	str.ptr = start;
+	*out = str;
 	return 1;
 }
 
@@ -358,7 +361,8 @@ eat_kv_pair(char **ptr, char *limit, KeyValuePair *kvp)
 static void
 mem_copy(void *dest, void *source, unsigned num) 
 {
-	unsigned char *d=dest, *s=source;
+	unsigned char* d = (unsigned char*)dest;
+	unsigned char* s = (unsigned char*)source;
 	for (unsigned i = 0; i < num; i++)
 		d[i]=s[i];
 }
@@ -368,12 +372,14 @@ more_memory(safetensors_File *out)
 {
 	if(out->num_tensors == out->c || out->num_metadata == out->c) {
 		void *new_tensors = realloc(out->tensors, sizeof(out->tensors[0])*(out->c+100));
-		if (!new_tensors) return "Out of memory";
-		out->tensors  = new_tensors;
+		if (!new_tensors)
+			return (char*)"Out of memory";
+		out->tensors = (safetensors_TensorDescriptor*)new_tensors;
 
 		void *new_metadata = realloc(out->metadata, sizeof(out->metadata[0])*(out->c+100));
-		if (!new_metadata) return "Out of memory";
-		out->metadata = new_metadata;
+		if (!new_metadata)
+			return (char*)"Out of memory";
+		out->metadata = (safetensors_MetadataEntry*)new_metadata;
 
 		out->c += 100;
 	}
@@ -386,7 +392,7 @@ apply_key_value_pair(safetensors_File *out, KeyValuePair kvp, char *baseptr)
 	#define KNOWN_DTYPES "F64, F32, F16, BF16, I64, I32, I16, I8, U8, or BOOL"
 	if (safetensors_str_equal(kvp.key, "dtype")) {
 		if (!kvp.value_is_str)
-			return "Expected a string value for 'dtype'";
+			return (char*)"Expected a string value for 'dtype'";
 		if (safetensors_str_equal(kvp.svalue, "F64"))
 			out->tensors[out->num_tensors].dtype = SAFETENSORS_F64;
 		else if (safetensors_str_equal(kvp.svalue, "F32"))
@@ -407,25 +413,25 @@ apply_key_value_pair(safetensors_File *out, KeyValuePair kvp, char *baseptr)
 			out->tensors[out->num_tensors].dtype = SAFETENSORS_U8;
 		else if (safetensors_str_equal(kvp.svalue, "BOOL"))
 			out->tensors[out->num_tensors].dtype = SAFETENSORS_BOOL;
-		else return "Unrecognized datatype (expected " KNOWN_DTYPES ")";
+		else return (char*)"Unrecognized datatype (expected " KNOWN_DTYPES ")";
 
 	} else if (safetensors_str_equal(kvp.key, "shape")) {
 		if (kvp.value_is_str)
-			return "Expected an integer list value for 'shape'";
+			return (char*)"Expected an integer list value for 'shape'";
 		out->tensors[out->num_tensors].n_dimensions = kvp.ivalue.num_entries;
 		for(int i = 0; i < kvp.ivalue.num_entries; i++)
 			out->tensors[out->num_tensors].shape[i] = kvp.ivalue.entries[i];
 	} else if (safetensors_str_equal(kvp.key, "data_offsets")) {
 		if (kvp.value_is_str)
-			return "Expected an integer list value for 'shape'";
+			return (char*)"Expected an integer list value for 'shape'";
 		if (kvp.ivalue.num_entries != 2)
-			return "Expected exactly two entries for the value of 'offsets'";
+			return (char*)"Expected exactly two entries for the value of 'offsets'";
 		out->tensors[out->num_tensors].begin_offset_bytes = kvp.ivalue.entries[0];
 		out->tensors[out->num_tensors].end_offset_bytes   = kvp.ivalue.entries[1];
 		out->tensors[out->num_tensors].ptr = baseptr + kvp.ivalue.entries[0];
 	} else {
 		// error? ignore?
-		return "Unexpected key (expected dtype, shape, or data_offsets)";
+		return (char*)"Unexpected key (expected dtype, shape, or data_offsets)";
 	}
 	return 0;
 }
@@ -441,12 +447,12 @@ safetensors_file_init(void *file_buffer, int64_t file_buffer_bytes, safetensors_
 		mem_copy(&header_len_u64, file_buffer, sizeof(header_len_u64));
 		if (header_len_u64 > (uint64_t)INT_MAX) 
 			#define STRINGIFY(x) #x
-			return "File header allegedly more than INT_MAX (" STRINGIFY(INT_MAX) ") bytes, file likely corrupt";
+			return (char*)"File header allegedly more than INT_MAX (" STRINGIFY(INT_MAX) ") bytes, file likely corrupt";
 		header_len = header_len_u64;
 	}
 	assert(header_len >= 0);
 	if (header_len == 0) 
-		return "File header allegedly zero bytes, file likely corrupt";
+		return (char*)"File header allegedly zero bytes, file likely corrupt";
 
 	char *t = ((char*)file_buffer)+8;
 	char *e = t + header_len;
@@ -454,7 +460,7 @@ safetensors_file_init(void *file_buffer, int64_t file_buffer_bytes, safetensors_
 
 	char *tensor_data_baseptr = t + header_len;
 
-	#define ST_ERR(message) return out->error_context=t, (message);
+	#define ST_ERR(message) return out->error_context = t, (char*)(message)
 
 	// mandatory open brace starts the header
 	if (!eat(&t,e,'{')) ST_ERR("Expected '{'");
@@ -502,7 +508,7 @@ safetensors_file_init(void *file_buffer, int64_t file_buffer_bytes, safetensors_
 				if(safetensors_str_equal(tensor_name, "__metadata__")) {
 					if(!kvp.value_is_str) 
 						return out->error_context=error_context, 
-						       "Expected a string value for a metadata entry";
+								(char*)("Expected a string value for a metadata entry");
 					out->metadata[out->num_metadata++] =
 						(safetensors_MetadataEntry) {
 							.name  = kvp.key,
