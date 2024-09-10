@@ -36,8 +36,8 @@
 #endif
 
 typedef struct {
-	int len;
 	char *ptr;
+	int len;
 } safetensors_Str;
 
 typedef struct {
