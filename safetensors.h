@@ -35,10 +35,15 @@
 #define SAFETENSORS_MAX_DIM 20 
 #endif
 
-typedef struct {
+#ifndef NONSTD_H
+typedef struct safetensors_Str {
 	char *ptr;
 	int len;
 } safetensors_Str;
+#else
+// compatibility with strings from https://github.com/hsnyder/nonstd
+typedef struct Str safetensors_Str;
+#endif
 
 typedef struct {
 	safetensors_Str name;
@@ -135,6 +140,8 @@ enum {
 	SAFETENSORS_I8,
 	SAFETENSORS_U8,
 	SAFETENSORS_BOOL,
+	SAFETENSORS_F8_E4M3,
+	SAFETENSORS_F8_E5M2,
 	
 	SAFETENSORS_NUM_DTYPES
 };
@@ -153,8 +160,35 @@ static int safetensors_dtype_size(int dtype)
 	case SAFETENSORS_I8:   return 1;
 	case SAFETENSORS_U8:   return 1;
 	case SAFETENSORS_BOOL: return 1; // TODO check if this is right
+	case SAFETENSORS_F8_E4M3: return 1;
+	case SAFETENSORS_F8_E5M2: return 1;
 	}
 	return 0;
+}
+
+
+// For convenience: human-readable names given a dtype code
+static const char *safetensors_dtype_name(int dtype)
+{
+	static const char *sft_type_names[] = {
+	    [SAFETENSORS_F64]  = "F64",
+	    [SAFETENSORS_F32]  = "F32",
+	    [SAFETENSORS_F16]  = "F16",
+	    [SAFETENSORS_BF16] = "BF16",
+	    [SAFETENSORS_I64]  = "I64",
+	    [SAFETENSORS_I32]  = "I32",
+	    [SAFETENSORS_I16]  = "I16",
+	    [SAFETENSORS_I8]   = "I8",
+	    [SAFETENSORS_U8]   = "U8",
+	    [SAFETENSORS_BOOL] = "BOOL",	
+	    [SAFETENSORS_F8_E4M3] = "F8_E4M3",
+	    [SAFETENSORS_F8_E5M2] = "F8_E5M2",
+	};
+
+	if (dtype >= 0 && dtype < sizeof(sft_type_names))
+		return sft_type_names[dtype];
+
+	return "INVALID";
 }
 
 #endif
@@ -413,6 +447,10 @@ apply_key_value_pair(safetensors_File *out, KeyValuePair kvp, char *baseptr)
 			out->tensors[out->num_tensors].dtype = SAFETENSORS_U8;
 		else if (safetensors_str_equal(kvp.svalue, "BOOL"))
 			out->tensors[out->num_tensors].dtype = SAFETENSORS_BOOL;
+		else if (safetensors_str_equal(kvp.svalue, "F8_E4M3"))
+			out->tensors[out->num_tensors].dtype = SAFETENSORS_F8_E4M3;
+		else if (safetensors_str_equal(kvp.svalue, "F8_E5M2"))
+			out->tensors[out->num_tensors].dtype = SAFETENSORS_F8_E5M2;
 		else return (char*)"Unrecognized datatype (expected " KNOWN_DTYPES ")";
 
 	} else if (safetensors_str_equal(kvp.key, "shape")) {
