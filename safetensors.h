@@ -20,9 +20,14 @@
 	library:
 	  -  limits.h
 	  -  stdint.h
+	  -  stddef.h
 	  -  stdlib.h
 	The latter is for realloc. A future update will allow the user to 
 	control the memory allocation, so that stdlib.h is not needed. 
+
+	As of 2025-05-30, safetensors is defined to be little-endian. This 
+	library will correctly parse a safetensors header on a host of either
+	endianness, but does not do any conversions on the actual tensor data.
 
 */
 
@@ -30,6 +35,7 @@
 #define SAFETENSORS_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 #ifndef SAFETENSORS_MAX_DIM 
 #define SAFETENSORS_MAX_DIM 20 
@@ -222,6 +228,24 @@ static const char *safetensors_dtype_name(int dtype)
 #include <limits.h>
 #include <stdlib.h>
 
+static void *safetensors_default_realloc(void *p, ptrdiff_t len, void *ctx) {
+	return realloc(p,len);
+}
+
+typedef struct safetensors_Allocator {
+	void *(*realloc)(void *, ptrdiff_t, void*) ;
+	void *ctx;
+} safetensors_Allocator;
+
+
+
+static safetensors_Allocator safetensors_default_allocator(void) {
+	safetensors_Allocator al;
+	al.realloc = safetensors_default_realloc;
+	al.ctx     = (void*)0;
+	return al;
+}
+
 static int64_t
 parse_positive_int(char **ptr, char *limit)
 {
@@ -392,25 +416,17 @@ eat_kv_pair(char **ptr, char *limit, KeyValuePair *kvp)
 	return 1;
 }
 
-static void
-mem_copy(void *dest, void *source, unsigned num) 
-{
-	unsigned char* d = (unsigned char*)dest;
-	unsigned char* s = (unsigned char*)source;
-	for (unsigned i = 0; i < num; i++)
-		d[i]=s[i];
-}
-
 static char *
 more_memory(safetensors_File *out)
 {
+	safetensors_Allocator al = safetensors_default_allocator();
 	if(out->num_tensors == out->c || out->num_metadata == out->c) {
-		void *new_tensors = realloc(out->tensors, sizeof(out->tensors[0])*(out->c+100));
+		void *new_tensors = al.realloc(out->tensors, sizeof(out->tensors[0])*(out->c+100), al.ctx);
 		if (!new_tensors)
 			return (char*)"Out of memory";
 		out->tensors = (safetensors_TensorDescriptor*)new_tensors;
 
-		void *new_metadata = realloc(out->metadata, sizeof(out->metadata[0])*(out->c+100));
+		void *new_metadata = al.realloc(out->metadata, sizeof(out->metadata[0])*(out->c+100), al.ctx);
 		if (!new_metadata)
 			return (char*)"Out of memory";
 		out->metadata = (safetensors_MetadataEntry*)new_metadata;
@@ -474,15 +490,29 @@ apply_key_value_pair(safetensors_File *out, KeyValuePair kvp, char *baseptr)
 	return 0;
 }
 
+
+static uint64_t 
+safetensors_read_le_u64(uint8_t bytes[8]) {
+    return ((uint64_t)bytes[0])       |
+           ((uint64_t)bytes[1] << 8)  |
+           ((uint64_t)bytes[2] << 16) |
+           ((uint64_t)bytes[3] << 24) |
+           ((uint64_t)bytes[4] << 32) |
+           ((uint64_t)bytes[5] << 40) |
+           ((uint64_t)bytes[6] << 48) |
+           ((uint64_t)bytes[7] << 56);
+}
+
+
 char *
 safetensors_file_init(void *file_buffer, int64_t file_buffer_bytes, safetensors_File *out)
 {	
-	*out = (safetensors_File){0};
+	if (file_buffer_bytes < 8) {return (char*) "Buffer < 8 bytes: cannot possibly be a valid safetensors file."; }
 
+	*out = (safetensors_File){0};
 	int header_len = 0;
 	{
-		uint64_t header_len_u64 = 0;
-		mem_copy(&header_len_u64, file_buffer, sizeof(header_len_u64));
+		uint64_t header_len_u64 = safetensors_read_le_u64((uint8_t*)file_buffer);
 		if (header_len_u64 > (uint64_t)INT_MAX) 
 			#define STRINGIFY(x) #x
 			return (char*)"File header allegedly more than INT_MAX (" STRINGIFY(INT_MAX) ") bytes, file likely corrupt";
