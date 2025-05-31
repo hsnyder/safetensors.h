@@ -24,7 +24,7 @@ debug_print_kv_str(safetensors_Str key, safetensors_Str value)
 }
 
 void 
-debug_print_kv_intlist(safetensors_Str key, IntList *intlist)
+debug_print_kv_intlist(safetensors_Str key, safetensors_IntList *intlist)
 {
 	debug_print_str(key);
 	printf(" = [");
@@ -65,6 +65,8 @@ void* read_file(char *filename, int64_t *file_size)
 
 int main (int argc, char *argv[])
 {
+	(void) argc;
+
 	char *filename = argv[1];
 	if (!filename) return 0;
 
@@ -76,8 +78,8 @@ int main (int argc, char *argv[])
 	char * result = safetensors_file_init(file, sz, &f); 
 	if(result) {
 		printf("%s\n", result);
-		for ( char *s = MAX(file, f.error_context-20);
-			s < MIN(f.error_context+21, f.one_byte_past_end_of_header);
+		for ( char *s = MAX((char*)file, f.error_context-20);
+			s < MIN(f.error_context+21, (char*)f.one_byte_past_end_of_header);
 			s++) fputc(*s,stdout);
 		printf("\n");
 		printf("                    ^ HERE\n");
@@ -100,8 +102,8 @@ int main (int argc, char *argv[])
 			printf("%lli%s", (long long) t.shape[j], delim);
 		}
 		printf("]\n\toffsets: [%lli, %lli]\n\tpointer: %p\n\n", 
-				t.begin_offset_bytes, 
-				t.end_offset_bytes,
+				(long long) t.begin_offset_bytes, 
+				(long long) t.end_offset_bytes,
 				t.ptr);
 		#endif
 	}

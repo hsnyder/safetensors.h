@@ -10,6 +10,13 @@
 	tensor descriptors. You can then loop over the tensor descriptors and 
 	pull out what you need. See the structs and functions below for details.
 
+	If you can't (or don't want to) read the whole file into memory, you can
+	use safetensors_read_le_u64 to read the first 8 bytes of the file. This
+	will tell you how big the header is. You can then read only that portion
+	of the file and are guaranteed to get the entire header. It's safe to call 
+	safetensors_file_init() on a buffer that contains at least that many 
+	bytes.
+
 	This file is a single-header library (credit to Sean Barrett for the
 	idea); it includes both the header and the actual definitions in 
 	a single file. To use this library, copy it  into your project, and 
@@ -41,14 +48,14 @@
 #define SAFETENSORS_MAX_DIM 20 
 #endif
 
-#ifndef NONSTD_H
+#ifdef NONSTD_H
+// compatibility with strings from https://github.com/hsnyder/nonstd
+typedef struct Str safetensors_Str;
+#else
 typedef struct safetensors_Str {
 	char *ptr;
 	int len;
 } safetensors_Str;
-#else
-// compatibility with strings from https://github.com/hsnyder/nonstd
-typedef struct Str safetensors_Str;
 #endif
 
 typedef struct {
@@ -133,6 +140,7 @@ static int safetensors_lookup(safetensors_File *f, const char *name)
 	return -1;
 }
 
+uint64_t safetensors_read_le_u64(uint8_t bytes[8]) ;
 
 // Enum values for the 'dtype' field
 enum {
@@ -191,7 +199,7 @@ static const char *safetensors_dtype_name(int dtype)
 	    [SAFETENSORS_F8_E5M2] = "F8_E5M2",
 	};
 
-	if (dtype >= 0 && dtype < sizeof(sft_type_names))
+	if (dtype >= 0 && dtype < (int)sizeof(sft_type_names))
 		return sft_type_names[dtype];
 
 	return "INVALID";
@@ -229,6 +237,7 @@ static const char *safetensors_dtype_name(int dtype)
 #include <stdlib.h>
 
 static void *safetensors_default_realloc(void *p, ptrdiff_t len, void *ctx) {
+	(void) ctx;
 	return realloc(p,len);
 }
 
@@ -247,7 +256,7 @@ static safetensors_Allocator safetensors_default_allocator(void) {
 }
 
 static int64_t
-parse_positive_int(char **ptr, char *limit)
+safetensors_parse_positive_int(char **ptr, char *limit)
 {
 	/*
 	 	- Skips preceeding spaces and tabs
@@ -280,7 +289,7 @@ parse_positive_int(char **ptr, char *limit)
 }
 
 static int
-eat(char **ptr, char *limit, char expected)
+safetensors_eat(char **ptr, char *limit, char expected)
 {
 	// skip whitespace
 	// return 0 if we hit the limit
@@ -295,32 +304,32 @@ eat(char **ptr, char *limit, char expected)
 }
 
 static int
-peek (char *ptr, char *limit, char expected)
+safetensors_peek (char *ptr, char *limit, char expected)
 {
 	// same as eat, but doesn't adjust the pointer
 	char *tmp = ptr;
-	return eat(&tmp, limit, expected);
+	return safetensors_eat(&tmp, limit, expected);
 }
 
 
 typedef struct {
 	int num_entries;
 	int64_t entries[SAFETENSORS_MAX_DIM];
-} IntList;
+} safetensors_IntList;
 
 static int 
-eat_intlist(char **ptr, char *limit, IntList *out)
+safetensors_eat_intlist(char **ptr, char *limit, safetensors_IntList *out)
 {
-	*out = (IntList){0};
+	*out = (safetensors_IntList){0};
 	char *p = *ptr;
-	if(!eat(&p,limit,'[')) return 0;
+	if(!safetensors_eat(&p,limit,'[')) return 0;
 
 	while (p < limit) {
 		char *p_save = p;
-		if(eat(&p,limit,']')) 
+		if(safetensors_eat(&p,limit,']')) 
 			break;
 
-		int64_t val = parse_positive_int(&p,limit);
+		int64_t val = safetensors_parse_positive_int(&p,limit);
 		if (val == -1) {
 			return 0;
 		} else {
@@ -330,8 +339,8 @@ eat_intlist(char **ptr, char *limit, IntList *out)
 			}
 		}
 
-		if(!eat(&p, limit, ','))
-			if(!peek(p, limit, ']'))
+		if(!safetensors_eat(&p, limit, ','))
+			if(!safetensors_peek(p, limit, ']'))
 				return 0;
 
 		assert(p != p_save);
@@ -343,12 +352,12 @@ eat_intlist(char **ptr, char *limit, IntList *out)
 
 
 static int
-eat_string(char **ptr, char *limit, safetensors_Str *out) 
+safetensors_eat_string(char **ptr, char *limit, safetensors_Str *out) 
 {
 	char delim = 0; 
 
-	if      (eat(ptr, limit, '\'')) delim = '\'';
-	else if (eat(ptr, limit, '"' )) delim = '"';
+	if      (safetensors_eat(ptr, limit, '\'')) delim = '\'';
+	else if (safetensors_eat(ptr, limit, '"' )) delim = '"';
 	else return 0; // bad delimiter
 
 	int len = 0;
@@ -380,28 +389,28 @@ typedef struct {
 	int value_is_str;
 	union {
 		safetensors_Str     svalue;
-		IntList ivalue;
+		safetensors_IntList ivalue;
 	};
-} KeyValuePair;
+} safetensors_KeyValuePair;
 
 static int
-eat_kv_pair(char **ptr, char *limit, KeyValuePair *kvp)
+safetensors_eat_kv_pair(char **ptr, char *limit, safetensors_KeyValuePair *kvp)
 {
 	char *p = *ptr;
 
 	// mandatory string (key)
-	if(!eat_string(&p, limit, &kvp->key)) 
+	if(!safetensors_eat_string(&p, limit, &kvp->key)) 
 		return 0;
 
-	if(!eat(&p, limit, ':'))
+	if(!safetensors_eat(&p, limit, ':'))
 		return 0;
 
 	// value can be string, or list of integers
 	safetensors_Str str_value = {0};
-	IntList intlist_value = {0};
+	safetensors_IntList intlist_value = {0};
 	
-	if (!eat_string(&p, limit, &str_value)){
-		if (!eat_intlist(&p, limit, &intlist_value)){
+	if (!safetensors_eat_string(&p, limit, &str_value)){
+		if (!safetensors_eat_intlist(&p, limit, &intlist_value)){
 			return 0;
 		} else {
 			kvp->value_is_str = 0;
@@ -417,7 +426,7 @@ eat_kv_pair(char **ptr, char *limit, KeyValuePair *kvp)
 }
 
 static char *
-more_memory(safetensors_File *out)
+safetensors_more_memory(safetensors_File *out)
 {
 	safetensors_Allocator al = safetensors_default_allocator();
 	if(out->num_tensors == out->c || out->num_metadata == out->c) {
@@ -437,7 +446,7 @@ more_memory(safetensors_File *out)
 }
 
 char *
-apply_key_value_pair(safetensors_File *out, KeyValuePair kvp, char *baseptr)
+safetensors_apply_key_value_pair(safetensors_File *out, safetensors_KeyValuePair kvp, char *baseptr)
 {
 	#define KNOWN_DTYPES "F64, F32, F16, BF16, I64, I32, I16, I8, U8, or BOOL"
 	if (safetensors_str_equal(kvp.key, "dtype")) {
@@ -491,7 +500,7 @@ apply_key_value_pair(safetensors_File *out, KeyValuePair kvp, char *baseptr)
 }
 
 
-static uint64_t 
+uint64_t 
 safetensors_read_le_u64(uint8_t bytes[8]) {
     return ((uint64_t)bytes[0])       |
            ((uint64_t)bytes[1] << 8)  |
@@ -531,45 +540,45 @@ safetensors_file_init(void *file_buffer, int64_t file_buffer_bytes, safetensors_
 	#define ST_ERR(message) return out->error_context = t, (char*)(message)
 
 	// mandatory open brace starts the header
-	if (!eat(&t,e,'{')) ST_ERR("Expected '{'");
+	if (!safetensors_eat(&t,e,'{')) ST_ERR("Expected '{'");
 
 	// loop over header entries
 	while (t<e) {
 		char *t_save = t;
 
 		// if we hit a close brace, we're done
-		if (eat(&t,e,'}')) goto header_ok;
+		if (safetensors_eat(&t,e,'}')) goto header_ok;
 
 		// mandatory string (tensor name)
 		safetensors_Str tensor_name = {0};
-		if (!eat_string(&t,e,&tensor_name)) 
+		if (!safetensors_eat_string(&t,e,&tensor_name)) 
 			ST_ERR("Expected tensor name");
-		if (!eat(&t,e,':'))
+		if (!safetensors_eat(&t,e,':'))
 			ST_ERR("Expected colon after tensor name");
 
-		char * alloc_error = more_memory(out);
+		char * alloc_error = safetensors_more_memory(out);
 		if (alloc_error) ST_ERR(alloc_error);
 
 		out->tensors[out->num_tensors].name = tensor_name;
 
 		// open brace starts a header entry
-		if (eat(&t,e,'{')) {
+		if (safetensors_eat(&t,e,'{')) {
 
 			// loop over key-value pairs inside the header entry
 			while (t<e) {
 				char *t_save = 0;
 
 				// close brace terminates the header entry
-				if (eat(&t,e,'}')) {
+				if (safetensors_eat(&t,e,'}')) {
 					if(!safetensors_str_equal(tensor_name, "__metadata__"))
 						++out->num_tensors;
 					break;
 				}
 
 				// otherwise it's a key-value pair
-				KeyValuePair kvp = {0};
+				safetensors_KeyValuePair kvp = {0};
 				char *error_context = t;
-				if(!eat_kv_pair(&t,e,&kvp))
+				if(!safetensors_eat_kv_pair(&t,e,&kvp))
 					ST_ERR("Expected a key-value pair");
 
 				// figure out what to do with the key-value pair
@@ -583,20 +592,20 @@ safetensors_file_init(void *file_buffer, int64_t file_buffer_bytes, safetensors_
 							.value = kvp.svalue
 						};
 				} else {
-					char * kvp_error = apply_key_value_pair(out,kvp,tensor_data_baseptr);
+					char * kvp_error = safetensors_apply_key_value_pair(out,kvp,tensor_data_baseptr);
 					if(kvp_error) return out->error_context=error_context, kvp_error;
 				}
 
-				if(!eat(&t,e,','))
-					if(!peek(t,e,'}'))
+				if(!safetensors_eat(&t,e,','))
+					if(!safetensors_peek(t,e,'}'))
 						ST_ERR("Expected comma");
 
 				assert(t != t_save);
 			}
 		}
 
-		if(!eat(&t,e,','))
-			if(!peek(t,e,'}'))
+		if(!safetensors_eat(&t,e,','))
+			if(!safetensors_peek(t,e,'}'))
 				ST_ERR("Expected comma");
 
 		assert(t != t_save);
