@@ -98,7 +98,7 @@ int main (int argc, char *argv[])
 		#ifndef CONDENSED_OUTPUT
 		printf("\tdtype: %i\n\tshape: (%i) [", t.dtype, t.n_dimensions);
 		for(int j = 0; j < t.n_dimensions; j++) {
-			char *delim = j==t.n_dimensions-1 ? "" : ", ";
+			const char *delim = j==t.n_dimensions-1 ? "" : ", ";
 			printf("%lli%s", (long long) t.shape[j], delim);
 		}
 		printf("]\n\toffsets: [%lli, %lli]\n\tpointer: %p\n\n", 
