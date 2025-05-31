@@ -4,13 +4,13 @@
 
 	safetensors.h: a library for reading .safetensors files from C.
 
-	Basic usage: read the entire .safetensors file into memory (this is not
+	Basic usage: read the entire .safetensors file into memory* (this is not
 	handled by safetensors.h) and feed it to safetensors_file_init(). This
 	will populate a safetensors_File struct, which contains an array of 
 	tensor descriptors. You can then loop over the tensor descriptors and 
 	pull out what you need. See the structs and functions below for details.
 
-	If you can't (or don't want to) read the whole file into memory, you can
+	*If you can't (or don't want to) read the whole file into memory, you can
 	use safetensors_read_le_u64 to read the first 8 bytes of the file. This
 	will tell you how big the header is. You can then read only that portion
 	of the file and are guaranteed to get the entire header. It's safe to call 
@@ -43,6 +43,10 @@
 
 #include <stdint.h>
 #include <stddef.h>
+
+#ifndef SAFETENSORS_API
+#define SAFETENSORS_API
+#endif
 
 #ifndef SAFETENSORS_MAX_DIM 
 #define SAFETENSORS_MAX_DIM 20 
@@ -110,7 +114,7 @@ typedef struct {
 	// the lengths of the above arrays
 } safetensors_File;
 
-char * safetensors_file_init(void *file_buffer, int64_t file_buffer_size_bytes, safetensors_File *out);
+SAFETENSORS_API char * safetensors_file_init(void *file_buffer, int64_t file_buffer_size_bytes, safetensors_File *out);
 // Given a file buffer, parses the safetensors header and populates a safetensors_File 
 // structure so that the client program can find the data it wants. file_buffer should 
 // point to a buffer that contains at least the entire header, or more preferably the 
@@ -120,15 +124,17 @@ char * safetensors_file_init(void *file_buffer, int64_t file_buffer_size_bytes, 
 // out->error_context such that it points to where in file_buffer the error happened.
 
 
-int safetensors_str_equal(safetensors_Str a, const char * b);
+SAFETENSORS_API int safetensors_str_equal(safetensors_Str a, const char * b);
 // For convenience: easily check if a tensor name matches a given string literal
 
-int safetensors_lookup(safetensors_File *f, const char *name);
+SAFETENSORS_API int safetensors_lookup(safetensors_File *f, const char *name);
 // For convenience: loop over tensors and return the index of the tensor whose 
 // name matches a given string (or -1, if no match is found).
 
 
-uint64_t safetensors_read_le_u64(uint8_t bytes[8]) ;
+SAFETENSORS_API uint64_t safetensors_read_le_u64(uint8_t bytes[8]) ;
+// Interpret 8 bytes as a little-endian uint64_t. Useful for reading the header
+// size field at the very start of the safetensors file.
 
 // Enum values for the 'dtype' field
 enum {
@@ -148,11 +154,11 @@ enum {
 	SAFETENSORS_NUM_DTYPES
 };
 
+SAFETENSORS_API int safetensors_dtype_size(int dtype);
 // For convenience: sizes of a given dtype code
-int safetensors_dtype_size(int dtype);
 
+SAFETENSORS_API const char *safetensors_dtype_name(int dtype);
 // For convenience: human-readable names given a dtype code
-const char *safetensors_dtype_name(int dtype);
 
 #endif
 
@@ -195,7 +201,7 @@ static int safetensors_strlen(const char *b)
 	return i;
 }
 
-int safetensors_str_equal(safetensors_Str a, const char * b)
+SAFETENSORS_API int safetensors_str_equal(safetensors_Str a, const char * b)
 // For convenience: easily check if a tensor name matches a given string literal
 {
 	if (!b) return 0;
@@ -207,7 +213,7 @@ int safetensors_str_equal(safetensors_Str a, const char * b)
 	return equal;
 }
 
-int safetensors_lookup(safetensors_File *f, const char *name)
+SAFETENSORS_API int safetensors_lookup(safetensors_File *f, const char *name)
 // For convenience: loop over tensors and return the index of the tensor whose 
 // name matches a given string (or -1, if no match is found).
 {
@@ -218,7 +224,7 @@ int safetensors_lookup(safetensors_File *f, const char *name)
 }
 
 // For convenience: sizes of a given dtype code
-int safetensors_dtype_size(int dtype)
+SAFETENSORS_API int safetensors_dtype_size(int dtype)
 {
 	switch(dtype) {
 	case SAFETENSORS_F64:  return 8;
@@ -239,7 +245,7 @@ int safetensors_dtype_size(int dtype)
 
 
 // For convenience: human-readable names given a dtype code
-const char *safetensors_dtype_name(int dtype)
+SAFETENSORS_API const char *safetensors_dtype_name(int dtype)
 {
 	static const char *sft_type_names[] = {
 	    [SAFETENSORS_F64]  = "F64",
@@ -472,7 +478,7 @@ safetensors_more_memory(safetensors_File *out)
 	return 0;
 }
 
-char *
+static char *
 safetensors_apply_key_value_pair(safetensors_File *out, safetensors_KeyValuePair kvp, char *baseptr)
 {
 	#define KNOWN_DTYPES "F64, F32, F16, BF16, I64, I32, I16, I8, U8, or BOOL"
@@ -527,7 +533,7 @@ safetensors_apply_key_value_pair(safetensors_File *out, safetensors_KeyValuePair
 }
 
 
-uint64_t 
+SAFETENSORS_API uint64_t 
 safetensors_read_le_u64(uint8_t bytes[8]) {
     return ((uint64_t)bytes[0])       |
            ((uint64_t)bytes[1] << 8)  |
@@ -540,7 +546,7 @@ safetensors_read_le_u64(uint8_t bytes[8]) {
 }
 
 
-char *
+SAFETENSORS_API char *
 safetensors_file_init(void *file_buffer, int64_t file_buffer_bytes, safetensors_File *out)
 {	
 	if (file_buffer_bytes < 8) {return (char*) "Buffer < 8 bytes: cannot possibly be a valid safetensors file."; }
