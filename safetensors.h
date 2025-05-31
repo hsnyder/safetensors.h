@@ -120,25 +120,13 @@ char * safetensors_file_init(void *file_buffer, int64_t file_buffer_size_bytes, 
 // out->error_context such that it points to where in file_buffer the error happened.
 
 
-static int safetensors_str_equal(safetensors_Str a, const char * b)
+int safetensors_str_equal(safetensors_Str a, const char * b);
 // For convenience: easily check if a tensor name matches a given string literal
-{
-	if (!b) return 0;
-	int equal = 1;
-	for (int i = 0  ;  (i < a.len && equal && b[i])  ;  i++) 
-		equal = equal  &&  a.ptr[i] == b[i];
-	return equal;
-}
 
-static int safetensors_lookup(safetensors_File *f, const char *name)
+int safetensors_lookup(safetensors_File *f, const char *name);
 // For convenience: loop over tensors and return the index of the tensor whose 
 // name matches a given string (or -1, if no match is found).
-{
-	for(int i = 0; i < f->num_tensors; i++)
-		if(safetensors_str_equal(f->tensors[i].name, name))
-			return i;
-	return -1;
-}
+
 
 uint64_t safetensors_read_le_u64(uint8_t bytes[8]) ;
 
@@ -161,49 +149,10 @@ enum {
 };
 
 // For convenience: sizes of a given dtype code
-static int safetensors_dtype_size(int dtype)
-{
-	switch(dtype) {
-	case SAFETENSORS_F64:  return 8;
-	case SAFETENSORS_F32:  return 4;
-	case SAFETENSORS_F16:  return 2;
-	case SAFETENSORS_BF16: return 2;
-	case SAFETENSORS_I64:  return 8;
-	case SAFETENSORS_I32:  return 4;
-	case SAFETENSORS_I16:  return 2;
-	case SAFETENSORS_I8:   return 1;
-	case SAFETENSORS_U8:   return 1;
-	case SAFETENSORS_BOOL: return 1; // TODO check if this is right
-	case SAFETENSORS_F8_E4M3: return 1;
-	case SAFETENSORS_F8_E5M2: return 1;
-	}
-	return 0;
-}
-
+int safetensors_dtype_size(int dtype);
 
 // For convenience: human-readable names given a dtype code
-static const char *safetensors_dtype_name(int dtype)
-{
-	static const char *sft_type_names[] = {
-	    [SAFETENSORS_F64]  = "F64",
-	    [SAFETENSORS_F32]  = "F32",
-	    [SAFETENSORS_F16]  = "F16",
-	    [SAFETENSORS_BF16] = "BF16",
-	    [SAFETENSORS_I64]  = "I64",
-	    [SAFETENSORS_I32]  = "I32",
-	    [SAFETENSORS_I16]  = "I16",
-	    [SAFETENSORS_I8]   = "I8",
-	    [SAFETENSORS_U8]   = "U8",
-	    [SAFETENSORS_BOOL] = "BOOL",	
-	    [SAFETENSORS_F8_E4M3] = "F8_E4M3",
-	    [SAFETENSORS_F8_E5M2] = "F8_E5M2",
-	};
-
-	if (dtype >= 0 && dtype < (int)sizeof(sft_type_names))
-		return sft_type_names[dtype];
-
-	return "INVALID";
-}
+const char *safetensors_dtype_name(int dtype);
 
 #endif
 
@@ -235,6 +184,84 @@ static const char *safetensors_dtype_name(int dtype)
 
 #include <limits.h>
 #include <stdlib.h>
+
+static int safetensors_strlen(const char *b) 
+{
+	if(!b) return 0;
+	int i = 0;
+	while (*b != 0) {
+		i++; b++;
+	}
+	return i;
+}
+
+int safetensors_str_equal(safetensors_Str a, const char * b)
+// For convenience: easily check if a tensor name matches a given string literal
+{
+	if (!b) return 0;
+	if (a.len==0) return 0;
+	if (safetensors_strlen(b) != a.len) return 0;
+	int equal = 1;
+	for (int i = 0  ;  (i < a.len && equal && b[i])  ;  i++) 
+		equal = equal  &&  a.ptr[i] == b[i];
+	return equal;
+}
+
+int safetensors_lookup(safetensors_File *f, const char *name)
+// For convenience: loop over tensors and return the index of the tensor whose 
+// name matches a given string (or -1, if no match is found).
+{
+	for(int i = 0; i < f->num_tensors; i++)
+		if(safetensors_str_equal(f->tensors[i].name, name))
+			return i;
+	return -1;
+}
+
+// For convenience: sizes of a given dtype code
+int safetensors_dtype_size(int dtype)
+{
+	switch(dtype) {
+	case SAFETENSORS_F64:  return 8;
+	case SAFETENSORS_F32:  return 4;
+	case SAFETENSORS_F16:  return 2;
+	case SAFETENSORS_BF16: return 2;
+	case SAFETENSORS_I64:  return 8;
+	case SAFETENSORS_I32:  return 4;
+	case SAFETENSORS_I16:  return 2;
+	case SAFETENSORS_I8:   return 1;
+	case SAFETENSORS_U8:   return 1;
+	case SAFETENSORS_BOOL: return 1; // TODO check if this is right
+	case SAFETENSORS_F8_E4M3: return 1;
+	case SAFETENSORS_F8_E5M2: return 1;
+	}
+	return 0;
+}
+
+
+// For convenience: human-readable names given a dtype code
+const char *safetensors_dtype_name(int dtype)
+{
+	static const char *sft_type_names[] = {
+	    [SAFETENSORS_F64]  = "F64",
+	    [SAFETENSORS_F32]  = "F32",
+	    [SAFETENSORS_F16]  = "F16",
+	    [SAFETENSORS_BF16] = "BF16",
+	    [SAFETENSORS_I64]  = "I64",
+	    [SAFETENSORS_I32]  = "I32",
+	    [SAFETENSORS_I16]  = "I16",
+	    [SAFETENSORS_I8]   = "I8",
+	    [SAFETENSORS_U8]   = "U8",
+	    [SAFETENSORS_BOOL] = "BOOL",	
+	    [SAFETENSORS_F8_E4M3] = "F8_E4M3",
+	    [SAFETENSORS_F8_E5M2] = "F8_E5M2",
+	};
+
+	if (dtype >= 0 && dtype < (int)(sizeof(sft_type_names)/sizeof(sft_type_names[0])))
+		return sft_type_names[dtype];
+
+	return "INVALID";
+}
+
 
 static void *safetensors_default_realloc(void *p, ptrdiff_t len, void *ctx) {
 	(void) ctx;
@@ -296,7 +323,7 @@ safetensors_eat(char **ptr, char *limit, char expected)
 	// return 0 if data don't match the expected string
 	// otherwise, return 1 and move the pointer to the end of the match
 	char *p = *ptr;
-	while(*p == ' ' || *p == '\t') ++p;
+	while((p < limit) && (*p == ' ' || *p == '\t')) ++p;
 	if (p + 1 > limit) return 0;
 	if (*p != expected) return 0;
 	*ptr = p + 1;
@@ -522,8 +549,8 @@ safetensors_file_init(void *file_buffer, int64_t file_buffer_bytes, safetensors_
 	int header_len = 0;
 	{
 		uint64_t header_len_u64 = safetensors_read_le_u64((uint8_t*)file_buffer);
+		#define STRINGIFY(x) #x
 		if (header_len_u64 > (uint64_t)INT_MAX) 
-			#define STRINGIFY(x) #x
 			return (char*)"File header allegedly more than INT_MAX (" STRINGIFY(INT_MAX) ") bytes, file likely corrupt";
 		header_len = header_len_u64;
 	}
