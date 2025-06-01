@@ -34,7 +34,8 @@
 
 	As of 2025-05-30, safetensors is defined to be little-endian. This 
 	library will correctly parse a safetensors header on a host of either
-	endianness, but does not do any conversions on the actual tensor data.
+	endianness, and safetensors_le_to_host can be used to convert tensor
+	data from LE to host endianness.
 
 */
 
@@ -163,6 +164,7 @@ SAFETENSORS_API const char *safetensors_dtype_name(int dtype);
 
 SAFETENSORS_API void safetensors_le_to_host(void *data, ptrdiff_t data_len_bytes, int element_size);
 // In-place byte order conversion from little-endian to host byte order (no-op on LE systems)
+// Internally asserts that element_size is 1, 2, 4, or 8.
 
 //SAFETENSORS_API void safetensors_host_to_le(void *data, ptrdiff_t data_len);
 //// In-place: makes sure data is in little-endian order, for safetensors writing

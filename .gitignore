@@ -1,3 +1,2 @@
-a.out
-safetensors_ls
-safetensors_dump
+a.out*
+run_test.sh
