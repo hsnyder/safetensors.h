@@ -95,23 +95,22 @@ int main (int argc, char *argv[])
 		debug_print_str(t.name);
 		printf("\n");
 
-		long n_el = 1;
-		for(int i = 0; i < t.n_dimensions; i++) n_el *= t.shape[i];
 		int dtype_size = safetensors_dtype_size(t.dtype);
-		safetensors_le_to_host(t.ptr, n_el*dtype_size, dtype_size); 
+		int64_t tensor_size = t.end_offset_bytes - t.begin_offset_bytes;
+		safetensors_le_to_host(t.ptr, tensor_size, dtype_size); 
 
 		#ifndef CONDENSED_OUTPUT
-		printf("\tdtype: %s\n\tshape: (%i) [", safetensors_dtype_name(t.dtype), t.n_dimensions);
+		printf("\tdtype:      %s\n\tn bytes:    %lli\n\tshape (%iD): [", safetensors_dtype_name(t.dtype), (long long)tensor_size, t.n_dimensions);
 		for(int j = 0; j < t.n_dimensions; j++) {
 			const char *delim = j==t.n_dimensions-1 ? "" : ", ";
 			printf("%lli%s", (long long) t.shape[j], delim);
 		}
-		printf("]\n\toffsets: [%lli, %lli]\n\tpointer: %p\n", 
+		printf("]\n\toffsets:    [%lli, %lli]\n\tpointer:    %p\n", 
 				(long long) t.begin_offset_bytes, 
 				(long long) t.end_offset_bytes,
 				t.ptr);
 		if(t.dtype == SAFETENSORS_F32 && t.shape[0] > 0)
-			printf("\tfirst value: %e\n", *(float*)t.ptr);
+			printf("\telement 0:  %e\n", *(float*)t.ptr);
 		printf("\n");
 		#endif
 	}
