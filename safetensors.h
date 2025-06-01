@@ -160,6 +160,15 @@ SAFETENSORS_API int safetensors_dtype_size(int dtype);
 SAFETENSORS_API const char *safetensors_dtype_name(int dtype);
 // For convenience: human-readable names given a dtype code
 
+
+SAFETENSORS_API void safetensors_le_to_host(void *data, ptrdiff_t data_len_bytes, int element_size);
+// In-place byte order conversion from little-endian to host byte order (no-op on LE systems)
+
+//SAFETENSORS_API void safetensors_host_to_le(void *data, ptrdiff_t data_len);
+//// In-place: makes sure data is in little-endian order, for safetensors writing
+//TODO: add support for writing safetensors files
+
+
 #endif
 
 /* 
@@ -190,6 +199,47 @@ SAFETENSORS_API const char *safetensors_dtype_name(int dtype);
 
 #include <limits.h>
 #include <stdlib.h>
+
+
+static int safetensors_host_is_little_endian(void)
+{
+	union {
+		unsigned int i;
+		unsigned char c[sizeof(unsigned int)];
+	} test;
+	test.i = 1;
+	return test.c[0] == 1;
+}
+
+static void safetensors_bswap(uint8_t* p, int size) 
+{
+	// despite appearances, gcc14 does a good job at -O3 on s390x.
+	for (int i = 0; i < size / 2; ++i) {
+		uint8_t tmp = p[i];
+		p[i] = p[size - 1 - i];
+		p[size - 1 - i] = tmp;
+	}
+}
+
+
+void
+safetensors_le_to_host(void *data, ptrdiff_t data_len_bytes, int element_size)
+{       
+        if(safetensors_host_is_little_endian()) return;
+        if(element_size == 1) return;
+        
+        assert(element_size == 2 || element_size == 4 || element_size == 8);
+
+        uint8_t *p = (uint8_t*)data;
+        data_len_bytes = (data_len_bytes/element_size)*element_size;
+
+        for(ptrdiff_t i = 0; i < data_len_bytes; i+=element_size) {
+                if(element_size==2)       safetensors_bswap(p+i, 2);
+                else if (element_size==4) safetensors_bswap(p+i, 4);
+                else if (element_size==8) safetensors_bswap(p+i, 8);
+        }
+}
+
 
 static int safetensors_strlen(const char *b) 
 {
