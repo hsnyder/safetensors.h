@@ -97,13 +97,19 @@ typedef struct {
 typedef struct {
 	int c; // internal use
 
+	int total_header_size;
+	// offset within the file at which the data segment starts.
+	// if you add begin_offset_bytes from a given tensor to this value,
+	// you'll have the tensor's absolute offset into the file.
+
 	char * error_context;
 	// if safetensors_file_init() fails, this pointer will be set to 
 	// where in the file memory block the error occurred.
 
 	void * one_byte_past_end_of_header;
 	// after calling safetensors_file_init, this will point to the 
-	// next byte after the end of the header
+	// next byte after the end of the header. If you've read
+	// the whole file into memory, this is the start of the data segment.
 
 	safetensors_TensorDescriptor *tensors;
 	safetensors_MetadataEntry    *metadata;
@@ -619,6 +625,7 @@ safetensors_file_init(void *file_buffer, int64_t file_buffer_bytes, safetensors_
 	char *t = ((char*)file_buffer)+8;
 	char *e = t + header_len;
 	out->one_byte_past_end_of_header = e;
+	out->total_header_size = header_len+8;
 
 	char *tensor_data_baseptr = t + header_len;
 
